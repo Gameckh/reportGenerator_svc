@@ -1,51 +1,64 @@
 package com.kevin.wordreportgenerator;
 
-import com.kevin.wordreportgenerator.data.Template;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-import java.io.File;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
-@Service
 public class TemplateService {
+    private static final String TEMPLATE_RECORD_FILE = "data/templates.json";
+    private static final String TEMPLATE_DIR = "templates/";
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Autowired
-    private TemplateRepository templateRepository;
+    public static void addTemplateRecord(String name, String path) throws IOException {
+        List<Map<String, String>> templates = getAllTemplates();
+        Map<String, String> newTemplate = new HashMap<>();
+        newTemplate.put("name", name);
+        newTemplate.put("path", path);
+        templates.add(newTemplate);
 
-    @Value("${file.template-dir}")
-    private String templateDir;
+        Files.write(Paths.get(TEMPLATE_RECORD_FILE), objectMapper.writeValueAsBytes(templates));
+    }
 
-    public Template uploadTemplate(String name, MultipartFile file) throws IOException {
-        // 确保目录存在
-        File dir = new File(templateDir);
-        if (!dir.exists()) {
-            dir.mkdirs();
+    public static List<Map<String, String>> getAllTemplates() throws IOException {
+        Path filePath = Paths.get(TEMPLATE_RECORD_FILE);
+        if (!Files.exists(filePath)) {
+            Files.createDirectories(filePath.getParent());
+            Files.write(filePath, "[]".getBytes());
+        }
+        return objectMapper.readValue(Files.readAllBytes(filePath), List.class);
+    }
+
+    // 删除模板文件和记录
+    public static boolean deleteTemplate(String name) throws IOException {
+        List<Map<String, String>> templates = getAllTemplates();
+
+        // 查找并删除记录
+        Optional<Map<String, String>> templateToDelete = templates.stream()
+                .filter(t -> t.get("name").equals(name))
+                .findFirst();
+
+        if (templateToDelete.isPresent()) {
+            // 删除文件
+            Path templatePath = Paths.get(TEMPLATE_DIR + name);
+            Files.deleteIfExists(templatePath);
+
+            // 更新JSON记录
+            List<Map<String, String>> updatedTemplates = templates.stream()
+                    .filter(t -> !t.get("name").equals(name))
+                    .collect(Collectors.toList());
+
+            Files.write(Paths.get(TEMPLATE_RECORD_FILE), objectMapper.writeValueAsBytes(updatedTemplates));
+            return true;
         }
 
-        // 保存文件
-        String filePath = templateDir + System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        File dest = new File(filePath);
-        file.transferTo(dest);
-
-        // 保存模板信息到数据库
-        Template template = new Template();
-        template.setName(name);
-        template.setFilePath(filePath);
-        template.setUploadTime(LocalDateTime.now().toString());
-
-        return templateRepository.save(template);
+        return false;
     }
 
-    public List<Template> getAllTemplates() {
-        return templateRepository.findAll();
-    }
-
-    public Template getTemplateById(Long id) {
-        return templateRepository.findById(id).orElse(null);
-    }
 }

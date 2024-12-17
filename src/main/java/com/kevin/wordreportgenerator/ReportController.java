@@ -1,59 +1,44 @@
 package com.kevin.wordreportgenerator;
 
-import com.kevin.wordreportgenerator.data.ReportRecord;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.kevin.wordreportgenerator.ReportService;
+import com.kevin.wordreportgenerator.ReportRequest;
+import org.apache.commons.io.IOUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.File;
-import java.nio.file.Files;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/reports")
 public class ReportController {
 
-    @Autowired
-    private ReportService reportService;
-
-    // 提交生成报告任务
     @PostMapping("/generate")
-    public ResponseEntity<ReportRecord> generateReport(@RequestParam("templateId") Long templateId,
-                                                       @RequestParam("dataJson") MultipartFile dataJsonFile) {
+    public ResponseEntity<?> generateReports(@RequestBody ReportRequest request) {
         try {
-            ReportRecord record = reportService.generateReport(templateId, dataJsonFile);
-            return ResponseEntity.ok(record);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).build();
-        }
-    }
+            // 调用 ReportService 生成 ZIP 文件
+            String zipFilePath = ReportService.generateReports(request);
+            File zipFile = new File(zipFilePath);
 
-    // 获取所有报告记录
-    @GetMapping
-    public ResponseEntity<List<ReportRecord>> getAllReportRecords() {
-        List<ReportRecord> records = reportService.getAllReportRecords();
-        return ResponseEntity.ok(records);
-    }
+            // 读取生成的 ZIP 文件并返回
+            FileInputStream fileInputStream = new FileInputStream(zipFile);
+            byte[] zipContent = IOUtils.toByteArray(fileInputStream);
 
-    // 下载生成的报告（压缩包）
-    @GetMapping("/download/{id}")
-    public ResponseEntity<byte[]> downloadReport(@PathVariable Long id) {
-        ReportRecord record = reportService.getReportRecordById(id);
-        if (record == null) {
-            return ResponseEntity.notFound().build();
-        }
-        try {
-            File file = new File(record.getGeneratedReportPath());
-            byte[] data = Files.readAllBytes(file.toPath());
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=\"" + file.getName() + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + zipFile.getName())
                     .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(data);
+                    .body(zipContent);
+
+        } catch (FileNotFoundException e) {
+            return ResponseEntity.status(404).body("ZIP file not found");
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body("Error generating reports");
         } catch (Exception e) {
-            return ResponseEntity.status(500).build();
+            return ResponseEntity.status(500).body("Internal server error");
         }
     }
 }

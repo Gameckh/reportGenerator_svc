@@ -1,70 +1,89 @@
 package com.kevin.wordreportgenerator;
 
-import com.kevin.wordreportgenerator.data.Template;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.FileInputStream;
 import java.io.File;
-import java.nio.file.Files;
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.*;
 
 @RestController
 @RequestMapping("/api/templates")
 public class TemplateController {
 
-    @Autowired
-    private TemplateService templateService;
+    private static final String TEMPLATE_DIR = "templates/";
 
     // 上传模板
     @PostMapping("/upload")
-    public ResponseEntity<Template> uploadTemplate(@RequestParam("name") String name,
-                                                   @RequestParam("file") MultipartFile file) {
-        // 验证文件类型
-        if (!file.getOriginalFilename().endsWith(".docx")) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
-        }
-
-        // 验证文件大小（例如，不超过100MB）
-        if (file.getSize() > 100 * 1024 * 1024) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
-        }
-
+    public ResponseEntity<?> uploadTemplate(@RequestParam("file") MultipartFile file) {
         try {
-            Template template = templateService.uploadTemplate(name, file);
-            return ResponseEntity.ok(template);
-        } catch (Exception e) {
-            return ResponseEntity.status(500).build();
+            // 保存文件
+            String fileName = file.getOriginalFilename();
+            Path path = Paths.get(TEMPLATE_DIR + fileName);
+            Files.createDirectories(path.getParent());
+            Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
+
+            // 更新JSON记录
+            TemplateService.addTemplateRecord(fileName, path.toString());
+            return ResponseEntity.ok("Template uploaded successfully");
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Upload failed");
         }
     }
 
     // 获取所有模板
-    @GetMapping
-    public ResponseEntity<List<Template>> getAllTemplates() {
-        List<Template> templates = templateService.getAllTemplates();
-        return ResponseEntity.ok(templates);
+    @GetMapping("/list")
+    public ResponseEntity<?> listTemplates() throws IOException {
+        return ResponseEntity.ok(TemplateService.getAllTemplates());
     }
 
-    // 下载模板
-    @GetMapping("/download/{id}")
-    public ResponseEntity<byte[]> downloadTemplate(@PathVariable Long id) {
-        Template template = templateService.getTemplateById(id);
-        if (template == null) {
-            return ResponseEntity.notFound().build();
-        }
+    @DeleteMapping("/delete/{name}")
+    public ResponseEntity<?> deleteTemplate(@PathVariable String name) {
         try {
-            File file = new File(template.getFilePath());
-            byte[] data = Files.readAllBytes(file.toPath());
+            if (TemplateService.deleteTemplate(name)) {
+                return ResponseEntity.ok("Template deleted");
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Template not found");
+            }
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Delete failed");
+        }
+    }
+
+    @GetMapping("/download/{name}")
+    public ResponseEntity<?> downloadTemplate(@PathVariable String name) {
+        try {
+            Path filePath = Paths.get(TEMPLATE_DIR + name);
+            if (Files.exists(filePath)) {
+                File file = filePath.toFile();
+
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName())
+                        .header(HttpHeaders.CONTENT_TYPE, "application/octet-stream")
+                        .body(new InputStreamResource(new FileInputStream(file)));
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Template not found");
+            }
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to download template");
+        }
+    }
+
+    @PostMapping("/generate")
+    public ResponseEntity<?> generateReports(@RequestBody ReportRequest request) {
+        try {
+            String zipPath = ReportService.generateReports(request);
+            File zipFile = new File(zipPath);
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=\"" + file.getName() + "\"")
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .body(data);
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + zipFile.getName())
+                    .body(new InputStreamResource(new FileInputStream(zipFile)));
         } catch (Exception e) {
-            return ResponseEntity.status(500).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to generate reports");
         }
     }
 }
