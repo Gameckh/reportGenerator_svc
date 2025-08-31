@@ -45,3 +45,18 @@ Word报告生成器 - 使用说明
 【版本信息】
 版本：1.0.0
 更新日期：2024年
+
+【开发者说明】
+如需重新构建前端（推荐方式）：
+1. 在你的前端项目中运行：pnpm build
+2. 将生成的dist文件夹拷贝到后端项目根目录
+3. 运行 integrate-frontend-simple.bat 进行前端集成
+4. 手动构建：mvn clean && mvn package -DskipTests
+5. 手动创建发布包（参考INSTALL_GUIDE.md）
+
+或者使用自动集成方式：
+1. 确保已安装pnpm：npm install -g pnpm
+2. 将前端项目文件夹重命名为 "reportGenerator_web" 并放在项目根目录
+3. 运行 integrate-frontend.bat 进行前端集成
+4. 手动构建：mvn clean && mvn package -DskipTests
+5. 手动创建发布包（参考INSTALL_GUIDE.md）

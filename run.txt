@@ -1,0 +1,1 @@
+java -jar WordReportGenerator-0.0.1-SNAPSHOT.jar --file.template-dir=D:/temp/templates/ --file.data=D:/temp/data/ --file.reports=D:/temp/reports/
