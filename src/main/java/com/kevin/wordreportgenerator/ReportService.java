@@ -51,7 +51,7 @@ public class ReportService {
         }
 
         for (int i = 0; i < maps.size(); i++) {
-            String reportName = "report_" + (i+1) + ".docx";
+            String reportName = generateFileName(request, data.get(i), i);
             Map<String, Object> map = maps.get(i);
             XWPFTemplate.compile(request.getTemplatePath()).render(map).writeToFile(outputDir + "/" + reportName);
         }
@@ -71,6 +71,78 @@ public class ReportService {
         }
         zipOut.close();
         return zipFilePath;
+    }
+
+    /**
+     * 生成文件名
+     * @param request 请求参数
+     * @param dataRow 数据行
+     * @param index 数据行索引
+     * @return 生成的文件名
+     */
+    private String generateFileName(ReportRequest request, List<String> dataRow, int index) {
+        String fileName;
+        
+        // 如果指定了nameColumn，优先使用数据列的值作为文件名
+        if (request.getNameColumn() != null && !request.getNameColumn().trim().isEmpty()) {
+            try {
+                int columnIndex = Integer.parseInt(request.getNameColumn());
+                if (columnIndex >= 0 && columnIndex < dataRow.size()) {
+                    String columnValue = dataRow.get(columnIndex);
+                    // 清理文件名中的非法字符
+                    fileName = sanitizeFileName(columnValue);
+                } else {
+                    // 列索引超出范围，使用默认命名
+                    fileName = "report_" + (index + 1);
+                }
+            } catch (NumberFormatException e) {
+                // 列索引格式错误，使用默认命名
+                fileName = "report_" + (index + 1);
+            }
+        } else if (request.getBaseFileName() != null && !request.getBaseFileName().trim().isEmpty()) {
+            // 使用基础文件名 + 序号的方式
+            fileName = request.getBaseFileName() + "_" + (index + 1);
+        } else {
+            // 默认命名方式
+            fileName = "report_" + (index + 1);
+        }
+        
+        // 添加文件扩展名
+        String extension = request.getFileExtension() != null ? request.getFileExtension() : ".docx";
+        if (!extension.startsWith(".")) {
+            extension = "." + extension;
+        }
+        
+        return fileName + extension;
+    }
+
+    /**
+     * 清理文件名中的非法字符
+     * @param fileName 原始文件名
+     * @return 清理后的文件名
+     */
+    private String sanitizeFileName(String fileName) {
+        if (fileName == null || fileName.trim().isEmpty()) {
+            return "unnamed";
+        }
+        
+        // 移除或替换Windows文件系统中的非法字符
+        String sanitized = fileName.replaceAll("[<>:\"/\\\\|?*]", "_");
+        
+        // 移除前后空格
+        sanitized = sanitized.trim();
+        
+        // 如果清理后为空，使用默认名称
+        if (sanitized.isEmpty()) {
+            return "unnamed";
+        }
+        
+        // 限制文件名长度（Windows限制为255字符，这里设置为200以留有余量）
+        if (sanitized.length() > 200) {
+            sanitized = sanitized.substring(0, 200);
+        }
+        
+        return sanitized;
     }
 
     /**

@@ -36,11 +36,11 @@ public class TemplateService {
         newTemplate.put("path", path);
         templates.add(newTemplate);
 
-        Files.write(Paths.get(dataDir + "/templates.json"), objectMapper.writeValueAsBytes(templates));
+        Files.write(Paths.get(dataDir, "templates.json"), objectMapper.writeValueAsBytes(templates));
     }
 
     public List<Map<String, String>> getAllTemplates() throws IOException {
-        Path filePath = Paths.get(dataDir + "/templates.json");
+        Path filePath = Paths.get(dataDir, "templates.json");
         if (!Files.exists(filePath)) {
             Files.createDirectories(filePath.getParent());
             Files.write(filePath, "[]".getBytes());
@@ -59,7 +59,7 @@ public class TemplateService {
 
         if (templateToDelete.isPresent()) {
             // 删除文件
-            Path templatePath = Paths.get(templateDir + name);
+            Path templatePath = Paths.get(templateDir, name);
             Files.deleteIfExists(templatePath);
 
             // 更新JSON记录
@@ -67,7 +67,7 @@ public class TemplateService {
                     .filter(t -> !t.get("name").equals(name))
                     .collect(Collectors.toList());
 
-            Files.write(Paths.get(dataDir + "/templates.json"), objectMapper.writeValueAsBytes(updatedTemplates));
+            Files.write(Paths.get(dataDir, "templates.json"), objectMapper.writeValueAsBytes(updatedTemplates));
             return true;
         }
 

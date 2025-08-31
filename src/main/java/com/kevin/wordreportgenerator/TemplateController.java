@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import javax.annotation.PostConstruct;
 
 import java.io.FileInputStream;
 import java.io.File;
@@ -20,6 +21,14 @@ public class TemplateController {
 
     @Value("${file.template-dir}")
     private String templateDir;
+    
+    @PostConstruct
+    public void init() {
+        System.out.println("=== TemplateController 初始化 ===");
+        System.out.println("模板目录配置: " + templateDir);
+        System.out.println("模板目录绝对路径: " + Paths.get(templateDir).toAbsolutePath());
+        System.out.println("================================");
+    }
     
     @Autowired
     private TemplateService templateService;
@@ -42,7 +51,7 @@ public class TemplateController {
             }
             
             // 保存文件
-            Path path = Paths.get(templateDir + fileName);
+            Path path = Paths.get(templateDir, fileName);
             Files.createDirectories(path.getParent());
             
             // 使用transferTo方法，更安全
@@ -53,6 +62,7 @@ public class TemplateController {
             templateService.addTemplateRecord(fileName, path.toString());
             return ResponseEntity.ok("Template uploaded successfully");
         } catch (IOException e) {
+            e.printStackTrace(); // 添加控制台输出
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Upload failed: " + e.getMessage());
         }
@@ -80,7 +90,7 @@ public class TemplateController {
     @GetMapping("/download/{name}")
     public ResponseEntity<?> downloadTemplate(@PathVariable String name) {
         try {
-            Path filePath = Paths.get(templateDir + name);
+            Path filePath = Paths.get(templateDir, name);
             if (Files.exists(filePath)) {
                 File file = filePath.toFile();
 
