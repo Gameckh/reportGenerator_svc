@@ -30,7 +30,7 @@ pnpm build
 # 例如：从 D:\projects\your-frontend\dist 拷贝到 D:\projects\geng_report\reportGenerator_svc\dist
 
 # 3. 运行集成脚本
-integrate-frontend-simple.bat
+integrate-frontend.bat
 ```
 
 #### 方式二：自动集成
