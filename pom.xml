@@ -50,6 +50,20 @@
             <version>5.8.23</version>
         </dependency>
 
+        <!-- ZXing Core for QR Code generation -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.2</version>
+        </dependency>
+
+        <!-- ZXing Java SE for QR Code generation -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.5.2</version>
+        </dependency>
+
         <!-- POI-TL -->
         <dependency>
             <groupId>com.deepoove</groupId>

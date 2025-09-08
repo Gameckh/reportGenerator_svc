@@ -5,9 +5,8 @@ import cn.hutool.extra.qrcode.QrConfig;
 import com.deepoove.poi.XWPFTemplate;
 import com.deepoove.poi.data.PictureType;
 import com.deepoove.poi.data.Pictures;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.apache.commons.io.IOUtils;
-import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -21,10 +20,10 @@ import java.util.zip.*;
 public class ReportService {
     @Value("${file.reports}")
     private String reportsDir;
-    
+
     @Value("${file.reports.history-limit:10}")
     private int historyLimit;
-    
+
     public String generateReports(ReportRequest request) throws Exception {
         // 创建以时间戳命名的子目录
         String timestamp = String.valueOf(System.currentTimeMillis());
@@ -35,8 +34,8 @@ public class ReportService {
         // 清理旧的生成目录（保留最多10次）
         cleanupOldDirectories();
 
-        ObjectMapper mapper = new ObjectMapper();
-        List<List<String>> data = mapper.readValue(request.getData(), List.class);
+        List<List<String>> data = request.getData();
+        String qrCodeColumn = request.getQrCodeColumn();
 
         List<Map<String, Object>> maps = new ArrayList<>();
         for (int i = 0; i < data.size(); i++) {
@@ -45,8 +44,27 @@ public class ReportService {
             for (int j = 0; j < item.size(); j++) {
                 map.put(String.valueOf(j), item.get(j));
             }
-//            map.put("QR", Pictures.ofBufferedImage(generateQRCode(item.get(1)), PictureType.PNG)
-//                    .size(47, 47).create());
+            
+            // 生成二维码（如果指定了二维码列）
+            if (qrCodeColumn != null && !qrCodeColumn.trim().isEmpty()) {
+                try {
+                    int columnIndex = Integer.parseInt(qrCodeColumn);
+                    if (columnIndex >= 0 && columnIndex < item.size()) {
+                        String qrText = item.get(columnIndex);
+                        if (qrText != null && !qrText.trim().isEmpty()) {
+                            map.put("QR", Pictures.ofBufferedImage(generateQRCode(qrText), PictureType.PNG)
+                                    .size(47, 47).create());
+                        }
+                    }
+                } catch (NumberFormatException e) {
+                    // 如果二维码列索引格式错误，跳过二维码生成
+                    System.err.println("Invalid QR code column index: " + qrCodeColumn);
+                } catch (Exception e) {
+                    // 如果二维码生成失败，跳过二维码生成
+                    System.err.println("Failed to generate QR code: " + e.getMessage());
+                }
+            }
+            
             maps.add(map);
         }
 
@@ -75,14 +93,15 @@ public class ReportService {
 
     /**
      * 生成文件名
+     * 
      * @param request 请求参数
      * @param dataRow 数据行
-     * @param index 数据行索引
+     * @param index   数据行索引
      * @return 生成的文件名
      */
     private String generateFileName(ReportRequest request, List<String> dataRow, int index) {
         String fileName;
-        
+
         // 如果指定了nameColumn，优先使用数据列的值作为文件名
         if (request.getNameColumn() != null && !request.getNameColumn().trim().isEmpty()) {
             try {
@@ -106,18 +125,19 @@ public class ReportService {
             // 默认命名方式
             fileName = "report_" + (index + 1);
         }
-        
+
         // 添加文件扩展名
         String extension = request.getFileExtension() != null ? request.getFileExtension() : ".docx";
         if (!extension.startsWith(".")) {
             extension = "." + extension;
         }
-        
+
         return fileName + extension;
     }
 
     /**
      * 清理文件名中的非法字符
+     * 
      * @param fileName 原始文件名
      * @return 清理后的文件名
      */
@@ -125,23 +145,23 @@ public class ReportService {
         if (fileName == null || fileName.trim().isEmpty()) {
             return "unnamed";
         }
-        
+
         // 移除或替换Windows文件系统中的非法字符
         String sanitized = fileName.replaceAll("[<>:\"/\\\\|?*]", "_");
-        
+
         // 移除前后空格
         sanitized = sanitized.trim();
-        
+
         // 如果清理后为空，使用默认名称
         if (sanitized.isEmpty()) {
             return "unnamed";
         }
-        
+
         // 限制文件名长度（Windows限制为255字符，这里设置为200以留有余量）
         if (sanitized.length() > 200) {
             sanitized = sanitized.substring(0, 200);
         }
-        
+
         return sanitized;
     }
 
@@ -162,7 +182,7 @@ public class ReportService {
 
         // 按修改时间排序，删除最早的目录
         Arrays.sort(subDirs, Comparator.comparingLong(File::lastModified));
-        
+
         // 删除最早的目录，直到只剩下配置的数量
         int deleteCount = subDirs.length - historyLimit;
         for (int i = 0; i < deleteCount; i++) {
@@ -194,8 +214,7 @@ public class ReportService {
         config.setMargin(0);
         BufferedImage bufferedImage = QrCodeUtil.generate(
                 text,
-                config
-        );
+                config);
         return bufferedImage;
     }
 }
